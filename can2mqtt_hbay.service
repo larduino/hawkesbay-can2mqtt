@@ -1,0 +1,20 @@
+
+[Unit]
+Description=CAN → MQTT bridge for Hawkes Bay controller
+After=network.target slcand.service
+Wants=slcand.service
+
+[Service]
+Type=simple
+User=pi
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/pi/hbay/can2mqtt_hbay.py
+Restart=always
+RestartSec=5
+ExecStartPre=/bin/true
+
+[Install]
+WantedBy=multi-user.target
+
+
+

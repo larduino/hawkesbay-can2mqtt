@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""
+can2mqtt_hbay.py — Hawkes Bay CAN → MQTT bridge
+
+Features:
+ - Reads battery voltage, current, power
+ - Reads MPPT info
+ - Reads Whizbang Jr current
+ - Reads daily cumulative kWh (0x022)
+ - Publishes MQTT topics and full JSON state
+ - Throttled publishing for battery, MPPT, Whizbang, and JSON output
+"""
+
+import can
+import paho.mqtt.client as mqtt
+import json
+import time
+from datetime import datetime
+
+# ----------------------------
+# Configuration
+# ----------------------------
+MQTT_BROKER = "192.168.3.50"
+MQTT_PORT = 1883
+MQTT_PREFIX = "hawkesbay"
+DISCOVERY_PREFIX = "homeassistant"
+CAN_INTERFACE = "can0"
+
+# Throttle intervals (seconds)
+BATTERY_INTERVAL = 1.0
+MPPT_INTERVAL = 1.0
+WHIZBANG_INTERVAL = 2.0
+STATE_INTERVAL = 5.0
+
+# ----------------------------
+# MQTT setup
+# ----------------------------
+client = mqtt.Client()
+client.connect(MQTT_BROKER, MQTT_PORT, 60)
+
+# ----------------------------
+# CAN setup
+# ----------------------------
+bus = can.interface.Bus(channel=CAN_INTERFACE, bustype="socketcan")
+
+print("📡 Hawkes Bay CAN → MQTT Bridge running...")
+
+# ----------------------------
+# Helper: Publish MQTT
+# ----------------------------
+def pub(topic, value, retain=True):
+    """Publish a value to hawkesbay/<topic>"""
+    full = f"{MQTT_PREFIX}/{topic}"
+    if isinstance(value, (dict, list)):
+        payload = json.dumps(value)
+    else:
+        payload = str(value)
+    client.publish(full, payload, retain=retain)
+
+# ----------------------------
+# Helper: Home Assistant discovery
+# ----------------------------
+def ha_discovery(sensor_id, name, unit, topic, device_class=None, state_class=None):
+    """Publish Home Assistant discovery config"""
+    cfg_topic = f"{DISCOVERY_PREFIX}/sensor/midnite_hawkes_bay_{sensor_id}/config"
+
+    payload = {
+        "name": name,
+        "uniq_id": f"midnite_hawkes_bay_{sensor_id}",
+        "state_topic": f"{MQTT_PREFIX}/{topic}",
+        "unit_of_measurement": unit,
+        "device": {
+            "identifiers": ["midnite_hawkes_bay"],
+            "name": "Midnite Hawkes Bay",
+            "model": "Hawke's Bay",
+            "manufacturer": "Midnite Solar"
+        }
+    }
+
+    if device_class:
+        payload["device_class"] = device_class
+    if state_class:
+        payload["state_class"] = state_class
+
+    client.publish(cfg_topic, json.dumps(payload), retain=True)
+
+# ----------------------------
+# Publish HA discovery
+# ----------------------------
+def publish_all_discovery():
+    ha_discovery("battery_voltage", "Battery Voltage", "V", "battery/voltage", "voltage", "measurement")
+    ha_discovery("battery_current", "Battery Current", "A", "battery/current", "current", "measurement")
+    ha_discovery("battery_power", "Battery Power", "W", "battery/power", "power", "measurement")
+    ha_discovery("pv_voltage_mppt2", "PV Voltage MPPT2", "V", "pv/voltage_mppt2", "voltage", "measurement")
+    ha_discovery("pv_current_mppt2", "PV Current MPPT2", "A", "pv/current_mppt2", "current", "measurement")
+    ha_discovery("whizbang_jr_amps", "Whizbang Jr Amps", "A", "whizbang/amps", "current", "measurement")
+    ha_discovery("daily_kwh_today", "Daily kWh Today", "kWh", "daily/kwh_today", "energy", "total")
+    ha_discovery("state_json", "Full HB JSON", "", "state", None, None)
+
+publish_all_discovery()
+
+# ----------------------------
+# Main state object
+# ----------------------------
+state = {
+    "battery": {},
+    "pv": {},
+    "whizbang": {},
+    "daily": {},
+    "mppt": {}
+}
+
+# ----------------------------
+# Throttle timers
+# ----------------------------
+last_battery = 0
+last_mppt = 0
+last_whizbang = 0
+last_state = 0
+
+# ----------------------------
+# Main loop
+# ----------------------------
+try:
+    while True:
+        msg = bus.recv()
+
+        if not msg:
+            time.sleep(0.01)
+            continue
+
+        now = time.time()
+        canid = msg.arbitration_id
+        data = list(msg.data)
+
+        register = (canid >> 18) & 0x7FF
+
+        # ----------------------------
+        # Battery V/A/P (0x0A0)
+        # ----------------------------
+        if register == 0x0A0 and len(data) >= 4:
+            voltage = (data[0] << 8 | data[1]) / 10.0
+            current = (data[2] << 8 | data[3]) / 10.0
+            power = voltage * current
+
+            state["battery"].update({
+                "voltage": voltage,
+                "current": current,
+                "power": power
+            })
+
+            if now - last_battery >= BATTERY_INTERVAL:
+                pub("battery/voltage", voltage)
+                pub("battery/current", current)
+                pub("battery/power", power)
+                last_battery = now
+
+        # ----------------------------
+        # MPPT #2 voltage/current (0x081)
+        # ----------------------------
+        elif register == 0x081 and len(data) >= 4:
+            mppt_v = (data[0] << 8 | data[1]) / 10.0
+            mppt_i = (data[2] << 8 | data[3]) / 10.0
+
+            state["pv"].update({
+                "mppt2_voltage": mppt_v,
+                "mppt2_current": mppt_i
+            })
+
+            if now - last_mppt >= MPPT_INTERVAL:
+                pub("pv/voltage_mppt2", mppt_v)
+                pub("pv/current_mppt2", mppt_i)
+                last_mppt = now
+
+        # ----------------------------
+        # Whizbang Jr (0x2A3)
+        # ----------------------------
+        elif register == 0x2A3 and len(data) >= 4:
+            raw = (data[2] << 8 | data[3])
+            if raw & 0x8000:
+                raw -= 0x10000
+
+            amps = raw / 10.0
+            status = data[0]
+            mode = data[1]
+
+            state["whizbang"].update({
+                "amps": amps,
+                "status": status,
+                "mode": mode
+            })
+
+            if now - last_whizbang >= WHIZBANG_INTERVAL:
+                pub("whizbang/amps", amps)
+                pub("whizbang/status", status)
+                pub("whizbang/mode", mode)
+                last_whizbang = now
+
+        # ----------------------------
+        # Daily kWh (0x022)
+        # ----------------------------
+        elif register == 0x022 and len(data) >= 4:
+            raw = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]
+            kwh = raw / 100.0
+
+            state["daily"]["today"] = kwh
+            pub("daily/kwh_today", round(kwh, 3))
+
+        # ----------------------------
+        # Publish full JSON state (throttled)
+        # ----------------------------
+        if now - last_state >= STATE_INTERVAL:
+            state["timestamp"] = datetime.utcnow().isoformat() + "Z"
+            pub("state", state)
+            last_state = now
+
+        client.loop(0.01)
+
+except KeyboardInterrupt:
+    print("Stopped by user")
+
+except Exception as e:
+    print("Unhandled exception:", e)
+    raise
