@@ -48,7 +48,7 @@ Supported controllers:
 ## 📦 Install Required Packages
 
 ### Install CAN utilities
-```bash
+```
 sudo apt install can-utils
 ```
 
@@ -76,7 +76,7 @@ cd hawkesbay-canbus-mqtt
 sudo ip link set can0 up type can bitrate 250000
 ```
 ### If using Innomaker 
-'''bash
+'''
 sudo ip link set can0 down
 sudo ip link set can0 type can bitrate 500000
 sudo ip link set can0 up
