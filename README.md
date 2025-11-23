@@ -1,5 +1,3 @@
-# hawkesbay-canbus-mqtt
-CAN → MQTT bridge for Midnite Solar Hawkes Bay, Barcelona, and potentially Rosie charge controllers.
 
 ## 📡 Overview
 This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT for Home Assistant, Node-RED, and other consumers.
@@ -176,3 +174,58 @@ MIT License
 
 ## 📬 Contact
 Open a GitHub Issue for questions, improvements, or contributions.
+=======
+hawkesbay-canbus-mqtt
+
+CAN → MQTT bridge for Midnite Solar Hawkes Bay, Barcelona, and potentially Rosie charge controllers.
+
+📡 Overview
+
+This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT. It allows you to view full system telemetry in:
+
+Home Assistant
+
+Node-RED
+
+MQTT Explorer
+
+Any MQTT-compatible system
+
+This project uses:
+
+A CANable / CANable Pro flashed with candleLight firmware
+
+SocketCAN on Raspberry Pi / Linux
+
+A Python script (can2mqtt_hbay.py) that decodes CAN frames and publishes MQTT topics
+
+Supported controllers:
+
+✔ Hawkes Bay
+
+✔ Barcelona
+
+⚠ Rosie (experimental — needs frame captures)
+
+🚀 Features
+
+Reads CANBus frames via SocketCAN (can0)
+
+Decodes:
+
+Battery voltage, current, power
+
+State of charge
+
+Temperatures
+
+PV (MPPT) voltage & current
+
+Whizbang Jr current readings
+
+Daily kWh production
+
+Throttled publishing to reduce MQTT noise
+
+Clean MQTT topic structure:
+
