@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-can2mqtt_hbay.py — Hawkes Bay CAN → MQTT bridge
+can2mqtt_hbay.py — Hawkes Bay CAN → MQTT bridge (InnoMaker)
 
 Features:
- - Reads battery voltage, current, power
+ - Reads battery voltage, current, power, and charge stage
  - Reads MPPT info
  - Reads Whizbang Jr current
  - Reads daily cumulative kWh (0x022)
@@ -39,11 +39,14 @@ client = mqtt.Client()
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 # ----------------------------
-# CAN setup
+# CAN bus setup
 # ----------------------------
-bus = can.interface.Bus(channel=CAN_INTERFACE, bustype="socketcan")
+bus = can.interface.Bus(
+    channel=CAN_INTERFACE,
+    interface="socketcan"  # InnoMaker USB2CAN
+)
 
-print("📡 Hawkes Bay CAN → MQTT Bridge running...")
+print("📡 Hawkes Bay CAN → MQTT Bridge running via InnoMaker USB2CAN...")
 
 # ----------------------------
 # Helper: Publish MQTT
@@ -63,7 +66,6 @@ def pub(topic, value, retain=True):
 def ha_discovery(sensor_id, name, unit, topic, device_class=None, state_class=None):
     """Publish Home Assistant discovery config"""
     cfg_topic = f"{DISCOVERY_PREFIX}/sensor/midnite_hawkes_bay_{sensor_id}/config"
-
     payload = {
         "name": name,
         "uniq_id": f"midnite_hawkes_bay_{sensor_id}",
@@ -76,12 +78,10 @@ def ha_discovery(sensor_id, name, unit, topic, device_class=None, state_class=No
             "manufacturer": "Midnite Solar"
         }
     }
-
     if device_class:
         payload["device_class"] = device_class
     if state_class:
         payload["state_class"] = state_class
-
     client.publish(cfg_topic, json.dumps(payload), retain=True)
 
 # ----------------------------
@@ -91,8 +91,12 @@ def publish_all_discovery():
     ha_discovery("battery_voltage", "Battery Voltage", "V", "battery/voltage", "voltage", "measurement")
     ha_discovery("battery_current", "Battery Current", "A", "battery/current", "current", "measurement")
     ha_discovery("battery_power", "Battery Power", "W", "battery/power", "power", "measurement")
+    ha_discovery("battery_charge_stage", "Battery Charge Stage", "", "battery/charge_stage")
     ha_discovery("pv_voltage_mppt2", "PV Voltage MPPT2", "V", "pv/voltage_mppt2", "voltage", "measurement")
     ha_discovery("pv_current_mppt2", "PV Current MPPT2", "A", "pv/current_mppt2", "current", "measurement")
+    # Optional Barcelona MPPT #1 discovery
+    # ha_discovery("pv_voltage_mppt0", "PV Voltage MPPT0", "V", "pv/voltage_mppt0", "voltage", "measurement")
+    # ha_discovery("pv_current_mppt0", "PV Current MPPT0", "A", "pv/current_mppt0", "current", "measurement")
     ha_discovery("whizbang_jr_amps", "Whizbang Jr Amps", "A", "whizbang/amps", "current", "measurement")
     ha_discovery("daily_kwh_today", "Daily kWh Today", "kWh", "daily/kwh_today", "energy", "total")
     ha_discovery("state_json", "Full HB JSON", "", "state", None, None)
@@ -119,12 +123,24 @@ last_whizbang = 0
 last_state = 0
 
 # ----------------------------
+# Battery Charge Stage mapping
+# ----------------------------
+CHARGE_STAGE = {
+    0: "Resting",
+    1: "Bulk MPPT",
+    2: "Absorb",
+    3: "Float",
+    4: "Equalize",
+    5: "Float MPPT",
+    6: "EQ MPPT"
+}
+
+# ----------------------------
 # Main loop
 # ----------------------------
 try:
     while True:
         msg = bus.recv()
-
         if not msg:
             time.sleep(0.01)
             continue
@@ -132,7 +148,6 @@ try:
         now = time.time()
         canid = msg.arbitration_id
         data = list(msg.data)
-
         register = (canid >> 18) & 0x7FF
 
         # ----------------------------
@@ -142,12 +157,7 @@ try:
             voltage = (data[0] << 8 | data[1]) / 10.0
             current = (data[2] << 8 | data[3]) / 10.0
             power = voltage * current
-
-            state["battery"].update({
-                "voltage": voltage,
-                "current": current,
-                "power": power
-            })
+            state["battery"].update({"voltage": voltage, "current": current, "power": power})
 
             if now - last_battery >= BATTERY_INTERVAL:
                 pub("battery/voltage", voltage)
@@ -156,21 +166,36 @@ try:
                 last_battery = now
 
         # ----------------------------
+        # Battery Charge Stage (0x0A3)
+        # ----------------------------
+        elif register == 0x0A3 and len(data) >= 1:
+            stage = data[0] & 0x0F
+            stage_str = CHARGE_STAGE.get(stage, f"Unknown({stage})")
+            state["battery"]["charge_stage"] = stage_str
+            pub("battery/charge_stage", stage_str)
+
+        # ----------------------------
         # MPPT #2 voltage/current (0x081)
         # ----------------------------
         elif register == 0x081 and len(data) >= 4:
             mppt_v = (data[0] << 8 | data[1]) / 10.0
             mppt_i = (data[2] << 8 | data[3]) / 10.0
-
-            state["pv"].update({
-                "mppt2_voltage": mppt_v,
-                "mppt2_current": mppt_i
-            })
+            state["pv"].update({"mppt2_voltage": mppt_v, "mppt2_current": mppt_i})
 
             if now - last_mppt >= MPPT_INTERVAL:
                 pub("pv/voltage_mppt2", mppt_v)
                 pub("pv/current_mppt2", mppt_i)
                 last_mppt = now
+
+        # ----------------------------
+        # MPPT #1 voltage/current (0x080)  # Optional for Barcelona
+        # ----------------------------
+        # elif register == 0x080 and len(data) >= 4:
+        #     mppt0_v = (data[0] << 8 | data[1]) / 10.0
+        #     mppt0_i = (data[2] << 8 | data[3]) / 10.0
+        #     state["pv"].update({"mppt0_voltage": mppt0_v, "mppt0_current": mppt0_i})
+        #     pub("pv/voltage_mppt0", mppt0_v)
+        #     pub("pv/current_mppt0", mppt0_i)
 
         # ----------------------------
         # Whizbang Jr (0x2A3)
@@ -179,16 +204,10 @@ try:
             raw = (data[2] << 8 | data[3])
             if raw & 0x8000:
                 raw -= 0x10000
-
             amps = raw / 10.0
             status = data[0]
             mode = data[1]
-
-            state["whizbang"].update({
-                "amps": amps,
-                "status": status,
-                "mode": mode
-            })
+            state["whizbang"].update({"amps": amps, "status": status, "mode": mode})
 
             if now - last_whizbang >= WHIZBANG_INTERVAL:
                 pub("whizbang/amps", amps)
@@ -202,7 +221,6 @@ try:
         elif register == 0x022 and len(data) >= 4:
             raw = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]
             kwh = raw / 100.0
-
             state["daily"]["today"] = kwh
             pub("daily/kwh_today", round(kwh, 3))
 
