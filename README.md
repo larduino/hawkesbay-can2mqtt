@@ -34,8 +34,9 @@ Supported controllers:
 
 ### Hardware
 - Raspberry Pi
-- CANable / CANable Pro (candleLight firmware)
-- CAN-H & CAN-L wired to charge controller
+- started with CANable / CANable Pro (candleLight firmware)
+- but now using Innomaker USB2CAN ( shows up as Can0 without a lot of setup) 
+- CAN-H & CAN-L wired to charge controller pin 4 Can High pin 5 Can Low
 
 ### Software
 - Linux with SocketCAN
