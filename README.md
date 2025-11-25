@@ -1,46 +1,59 @@
+# HawkesBay CAN → MQTT Bridge
+
+CAN → MQTT bridge for Midnite Solar Hawkes Bay, Barcelona, and potentially Rosie charge controllers.
+
+---
 
 ## 📡 Overview
-This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT for Home Assistant, Node-RED, and other consumers.
+This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT. It allows you to view full system telemetry in:
 
-Uses:
-- CANable / CANable Pro (candleLight firmware)
-- SocketCAN on Linux / Raspberry Pi
-- Python script (`can2mqtt_hbay.py`) to decode CAN frames
+- Home Assistant  
+- Node-RED  
+- MQTT Explorer  
+- Any MQTT-compatible system  
+
+This project uses:
+
+- InnoMaker USB2CAN (preferred, automatically detected as `can0`)  
+- SocketCAN on Linux / Raspberry Pi  
+- Python script (`can2mqtt_hbay.py`) to decode CAN frames  
 
 Supported controllers:
-- Hawkes Bay
-- Barcelona
-- Rosie *(experimental)*
+
+- ✔ Hawkes Bay  
+- ✔ Barcelona *(commented-out code, can be enabled for Barcelona users)*  
+- ⚠ Rosie *(experimental — needs frame captures)*
 
 ---
 
 ## 🚀 Features
-- Reads CANBus frames from `can0`
-- Decodes:
-  - Battery voltage, current, power
-  - State of charge
-  - Temperatures
-  - PV MPPT voltage & current
-  - Whizbang Jr current
-  - Daily kWh  
-- Throttled MQTT publishing
-- Clean MQTT topic structure
-- Optional Home Assistant Discovery
-- Optional systemd service
+
+- Reads CANBus frames via SocketCAN (`can0`)  
+- Decodes:  
+  - Battery voltage, current, power  
+  - State of charge / charge stage  
+  - Temperatures  
+  - PV MPPT voltage & current  
+  - Whizbang Jr current  
+  - Daily kWh production  
+- Throttled MQTT publishing to reduce traffic  
+- Clean MQTT topic structure  
+- Optional Home Assistant discovery  
+- Optional systemd service  
 
 ---
 
 ## 🔧 Requirements
 
 ### Hardware
-- Raspberry Pi
-- started with CANable / CANable Pro (candleLight firmware)
-- but now using Innomaker USB2CAN ( shows up as Can0 without a lot of setup) 
-- CAN-H & CAN-L wired to charge controller pin 4 Can High pin 5 Can Low
+- Raspberry Pi  
+- InnoMaker USB2CAN (preferred)  
+- CAN-H & CAN-L wired to charge controller (pin 4 = CAN High, pin 5 = CAN Low)
+
 
 ### Software
-- Linux with SocketCAN
-- Python 3.8+
+- Linux with SocketCAN  
+- Python 3.8+  
 - MQTT broker (Mosquitto recommended)
 
 ---
@@ -50,26 +63,23 @@ Supported controllers:
 ### Install CAN utilities
 ```
 sudo apt install can-utils
-```
 
-### Python dependencies
-```bash
+Python dependencies
+
 pip3 install paho-mqtt python-can
-```
 
----
+📥 Installation
+1. Clone the repository
 
-## 📥 Installation
-
-### 1. Clone the repository
-```bash
 git clone https://github.com/<your-username>/hawkesbay-canbus-mqtt.git
 cd hawkesbay-canbus-mqtt
-```
 
----
+🔌 Enable SocketCAN
+Innomaker USB2CAN (preferred)
 
-## 🔌 Enable SocketCAN
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set can0 up
 
 ### If using CANable (candleLight)
 ```bash
@@ -82,70 +92,60 @@ sudo ip link set can0 type can bitrate 500000
 sudo ip link set can0 up
 '''
 
-Verify:
-```bash
-ifconfig can0
-```
+Optional: Monitor CAN live
 
-Monitor live CAN:
-```bash
+
 candump can0
-```
 
----
+Verify interface
 
-## ▶️ Running the Script
+ifconfig can0
 
-### Run directly
-```bash
+▶️ Running the Script
+Run directly
+
 python3 can2mqtt_hbay.py
-```
 
-### Optional: fix ownership
-```bash
+Optional: fix ownership
+
 sudo chown pi:pi can2mqtt_hbay.py
-```
 
-### Optional: make executable
-```bash
+Optional: make executable
+
 chmod +x can2mqtt_hbay.py
-```
 
----
+🛠 systemd Service (optional)
+Install service
 
-## 🛠 systemd Service (optional)
-
-### Install service
-```bash
 sudo cp can2mqtt_hbay.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now can2mqtt_hbay.service
-```
 
-### View logs
-```bash
+View logs
+
 sudo journalctl -fu can2mqtt_hbay.service
-```
 
----
+📡 Example MQTT Topics
 
-## 📡 Example MQTT Topics
-```
 hawkesbay/battery/voltage
 hawkesbay/battery/current
 hawkesbay/battery/power
+hawkesbay/battery/charge_stage
 hawkesbay/pv/voltage_mppt2
 hawkesbay/pv/current_mppt2
 hawkesbay/daily/kwh_today
 hawkesbay/whizbang/amps
+hawkesbay/whizbang/status
+hawkesbay/whizbang/mode
 hawkesbay/state
-```
 
----
+Optional Barcelona topics (commented-out in code)
 
-## 🏠 Home Assistant Example
+hawkesbay/pv/voltage_mppt0
+hawkesbay/pv/current_mppt0
 
-```yaml
+🏠 Home Assistant Example
+
 sensor:
   - platform: mqtt
     name: "HB Battery Voltage"
@@ -156,83 +156,37 @@ sensor:
     name: "HB PV Watts"
     state_topic: "hawkesbay/pv/watts"
     unit_of_measurement: "W"
-```
 
----
+🔌 Wiring Diagram
 
-## 📝 Notes
-- Barcelona and Rosie decoding may require refining.
-- PRs welcome for new CAN frame IDs or captured logs.
+Charge Controller      Raspberry Pi / USB2CAN
+-------------          -------------------
+Pin 4 CAN High   -->   CAN-H
+Pin 5 CAN Low    -->   CAN-L
+GND              -->   GND
+5V / 3.3V        -->   USB power for USB2CAN (if needed)
 
----
+📝 Notes
 
-## 🤝 Contributing
+    Barcelona MPPT #1 section is left commented for future users.
+
+    Rosie decoding is experimental.
+
+    PRs welcome for new CAN frame IDs, controller support, or documentation improvements.
+
+🤝 Contributing
+
 PRs welcome — especially:
-- New CAN frame IDs
-- Expanded controller support
-- Documentation improvements
 
----
+    New CAN frame IDs
 
-## 📜 License
+    Expanded controller support
+
+    Documentation improvements
+
+📜 License
+
 MIT License
+📬 Contact
 
----
-
-## 📬 Contact
 Open a GitHub Issue for questions, improvements, or contributions.
-=======
-hawkesbay-canbus-mqtt
-
-CAN → MQTT bridge for Midnite Solar Hawkes Bay, Barcelona, and potentially Rosie charge controllers.
-
-📡 Overview
-
-This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT. It allows you to view full system telemetry in:
-
-Home Assistant
-
-Node-RED
-
-MQTT Explorer
-
-Any MQTT-compatible system
-
-This project uses:
-
-A CANable / CANable Pro flashed with candleLight firmware
-
-SocketCAN on Raspberry Pi / Linux
-
-A Python script (can2mqtt_hbay.py) that decodes CAN frames and publishes MQTT topics
-
-Supported controllers:
-
-✔ Hawkes Bay
-
-✔ Barcelona
-
-⚠ Rosie (experimental — needs frame captures)
-
-🚀 Features
-
-Reads CANBus frames via SocketCAN (can0)
-
-Decodes:
-
-Battery voltage, current, power
-
-State of charge
-
-Temperatures
-
-PV (MPPT) voltage & current
-
-Whizbang Jr current readings
-
-Daily kWh production
-
-Throttled publishing to reduce MQTT noise
-
-Clean MQTT topic structure:
-

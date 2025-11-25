@@ -1,20 +1,18 @@
-
 [Unit]
-Description=CAN → MQTT bridge for Hawkes Bay controller
-After=network.target slcand.service
-Wants=slcand.service
+Description=Hawkes Bay CAN to MQTT Bridge
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-Environment=PYTHONUNBUFFERED=1
+# Wait until can0 is UP
+ExecStartPre=/bin/sh -c 'until ip link show can0 | grep -q "UP"; do sleep 1; done'
 ExecStart=/usr/bin/python3 /home/pi/hbay/can2mqtt_hbay.py
 Restart=always
 RestartSec=5
-ExecStartPre=/bin/true
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-
-
-

@@ -9,12 +9,14 @@ Features:
  - Reads daily cumulative kWh (0x022)
  - Publishes MQTT topics and full JSON state
  - Throttled publishing for battery, MPPT, Whizbang, and JSON output
+ - Waits for can0 automatically
 """
 
+import os
+import time
 import can
 import paho.mqtt.client as mqtt
 import json
-import time
 from datetime import datetime
 
 # ----------------------------
@@ -39,32 +41,31 @@ client = mqtt.Client()
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
 # ----------------------------
+# Wait for can0
+# ----------------------------
+print("⏳ Waiting for can0 interface...")
+while not os.path.exists(f"/sys/class/net/{CAN_INTERFACE}"):
+    time.sleep(1)
+print(f"✅ {CAN_INTERFACE} detected, starting CAN bus...")
+
+# ----------------------------
 # CAN bus setup
 # ----------------------------
-bus = can.interface.Bus(
-    channel=CAN_INTERFACE,
-    interface="socketcan"  # InnoMaker USB2CAN
-)
-
+bus = can.interface.Bus(channel=CAN_INTERFACE, interface="socketcan")
 print("📡 Hawkes Bay CAN → MQTT Bridge running via InnoMaker USB2CAN...")
 
 # ----------------------------
 # Helper: Publish MQTT
 # ----------------------------
 def pub(topic, value, retain=True):
-    """Publish a value to hawkesbay/<topic>"""
     full = f"{MQTT_PREFIX}/{topic}"
-    if isinstance(value, (dict, list)):
-        payload = json.dumps(value)
-    else:
-        payload = str(value)
+    payload = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
     client.publish(full, payload, retain=retain)
 
 # ----------------------------
 # Helper: Home Assistant discovery
 # ----------------------------
 def ha_discovery(sensor_id, name, unit, topic, device_class=None, state_class=None):
-    """Publish Home Assistant discovery config"""
     cfg_topic = f"{DISCOVERY_PREFIX}/sensor/midnite_hawkes_bay_{sensor_id}/config"
     payload = {
         "name": name,
@@ -94,11 +95,11 @@ def publish_all_discovery():
     ha_discovery("battery_charge_stage", "Battery Charge Stage", "", "battery/charge_stage")
     ha_discovery("pv_voltage_mppt2", "PV Voltage MPPT2", "V", "pv/voltage_mppt2", "voltage", "measurement")
     ha_discovery("pv_current_mppt2", "PV Current MPPT2", "A", "pv/current_mppt2", "current", "measurement")
-    # Optional Barcelona MPPT #1 discovery
+    # Optional Barcelona MPPT #1 discovery (commented out)
     # ha_discovery("pv_voltage_mppt0", "PV Voltage MPPT0", "V", "pv/voltage_mppt0", "voltage", "measurement")
     # ha_discovery("pv_current_mppt0", "PV Current MPPT0", "A", "pv/current_mppt0", "current", "measurement")
     ha_discovery("whizbang_jr_amps", "Whizbang Jr Amps", "A", "whizbang/amps", "current", "measurement")
-    ha_discovery("daily_kwh_today", "Daily kWh Today", "kWh", "daily/kwh_today", "energy", "total")
+    ha_discovery("daily_kwh_today", "Daily KWh Today", "kWh", "daily/kwh_today", "energy", "total")
     ha_discovery("state_json", "Full HB JSON", "", "state", None, None)
 
 publish_all_discovery()
@@ -106,21 +107,12 @@ publish_all_discovery()
 # ----------------------------
 # Main state object
 # ----------------------------
-state = {
-    "battery": {},
-    "pv": {},
-    "whizbang": {},
-    "daily": {},
-    "mppt": {}
-}
+state = {"battery": {}, "pv": {}, "whizbang": {}, "daily": {}, "mppt": {}}
 
 # ----------------------------
 # Throttle timers
 # ----------------------------
-last_battery = 0
-last_mppt = 0
-last_whizbang = 0
-last_state = 0
+last_battery = last_mppt = last_whizbang = last_state = 0
 
 # ----------------------------
 # Battery Charge Stage mapping
@@ -158,7 +150,6 @@ try:
             current = (data[2] << 8 | data[3]) / 10.0
             power = voltage * current
             state["battery"].update({"voltage": voltage, "current": current, "power": power})
-
             if now - last_battery >= BATTERY_INTERVAL:
                 pub("battery/voltage", voltage)
                 pub("battery/current", current)
@@ -181,14 +172,13 @@ try:
             mppt_v = (data[0] << 8 | data[1]) / 10.0
             mppt_i = (data[2] << 8 | data[3]) / 10.0
             state["pv"].update({"mppt2_voltage": mppt_v, "mppt2_current": mppt_i})
-
             if now - last_mppt >= MPPT_INTERVAL:
                 pub("pv/voltage_mppt2", mppt_v)
                 pub("pv/current_mppt2", mppt_i)
                 last_mppt = now
 
         # ----------------------------
-        # MPPT #1 voltage/current (0x080)  # Optional for Barcelona
+        # Optional MPPT #1 for Barcelona (0x080)
         # ----------------------------
         # elif register == 0x080 and len(data) >= 4:
         #     mppt0_v = (data[0] << 8 | data[1]) / 10.0
@@ -208,7 +198,6 @@ try:
             status = data[0]
             mode = data[1]
             state["whizbang"].update({"amps": amps, "status": status, "mode": mode})
-
             if now - last_whizbang >= WHIZBANG_INTERVAL:
                 pub("whizbang/amps", amps)
                 pub("whizbang/status", status)
@@ -225,7 +214,7 @@ try:
             pub("daily/kwh_today", round(kwh, 3))
 
         # ----------------------------
-        # Publish full JSON state (throttled)
+        # Publish full JSON state
         # ----------------------------
         if now - last_state >= STATE_INTERVAL:
             state["timestamp"] = datetime.utcnow().isoformat() + "Z"
