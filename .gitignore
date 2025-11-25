@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Virtual envs
+venv/
+.env/
+
+# Systemd backup files
+*.service~
