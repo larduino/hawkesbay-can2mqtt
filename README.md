@@ -148,30 +148,3 @@ License
 
 MIT License
 
-
----
-
-### ✅ Why this one works
-- ✅ Triple-backtick code fences everywhere
-- ✅ Simple GitHub-safe table formatting
-- ✅ No Markdown tricks that break in README previews
-- ✅ Verified structure matches your repo and branches
-
-### ✅ What to do next
-1. Replace your README.md with this
-2. Commit
-3. Push
-4. View **on GitHub**, not in Nano
-
-If the table *still* looks wrong on GitHub, something else is interfering and we’ll fix *that*, but this README is known-good.
-
-If you want, next we can:
-- add Home Assistant autodiscovery docs  
-- add wiring diagram images  
-- add troubleshooting section  
-- add a Pi5 “Quick Start” box at the top  
-
-Just say the word.
-
-
-
