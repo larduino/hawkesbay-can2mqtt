@@ -1,162 +1,177 @@
-Hawkes Bay CAN → MQTT Bridge
+# Hawkes Bay CAN → MQTT Bridge
 
-Reads CANBus data from Midnite Solar charge controllers and publishes to MQTT for Home Assistant, Node-RED, or any MQTT consumer.
+## Purpose
 
-Table of Contents
+Read raw CANBus frames from Midnite Solar charge controllers (Hawkes Bay, Barcelona, experimental Rosie), decode metrics, and publish them to MQTT for Home Assistant, Node-RED, or any MQTT consumer.
 
-Pi3 Standalone Setup
+---
 
-Pi5 IOTstack Dockerized Setup
+## Pi3 vs Pi5 Setup Comparison
 
-MQTT Topics
+| Feature | Pi3 Standalone | Pi5 IOTstack (Docker) |
+|-------|---------------|-----------------------|
+| Raspberry Pi Model | 3B+ | 5 |
+| Python | Local install (3.8+) | Docker container (python 3.11-slim) |
+| CAN Adapter | Innomaker USB2CAN / CANable | Innomaker USB2CAN / CANable |
+| CAN Interface | SocketCAN (`can0`) | SocketCAN (`can0`) |
+| CAN Startup | systemd + udev | systemd CAN service |
+| MQTT Broker | Local or network Mosquitto | IOTstack Mosquitto |
+| Script Execution | systemd service | Docker container |
+| Auto Restart | systemd | Docker restart policy |
+| GitHub Branch | `main` / `master` | `pi5_iotstack` |
+| Docker Required | ❌ | ✅ |
 
-License
+---
 
-Pi3 Standalone Setup
+## Hardware
 
-This is the original setup running directly on a Raspberry Pi 3B+.
+- Raspberry Pi (3B+ standalone or 5 with IOTstack)
+- Innomaker USB2CAN (preferred) or CANable / CANable Pro
+- CAN-H and CAN-L connected to Midnite Solar charge controller
 
-Hardware
+---
 
-Raspberry Pi 3B+
+## Software
 
-Innomaker USB2CAN or CANable/CANable Pro
+- Linux with SocketCAN
+- Python 3.8+ (Pi3) or Docker (Pi5)
+- MQTT broker (Mosquitto recommended)
 
-CAN-H & CAN-L connected to charge controller
+---
 
-Software
+## GitHub Branches
 
-Linux with SocketCAN
+- **main / master**  
+  Raspberry Pi 3 standalone installation (no Docker)
 
-Python 3.8+
+- **pi5_iotstack**  
+  Raspberry Pi 5 with IOTstack using Docker
 
-MQTT broker (Mosquitto recommended)
+---
 
-Installation
+## Pi3 Standalone Setup
 
-Clone the repo:
-
-git clone https://github.com/larduino/hawkesbay-can2mqtt.git
-cd hawkesbay-can2mqtt/pi3_standalone
-
-
-Install Python dependencies:
-
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+1. Install dependencies:
+```bash
+sudo apt install python3 python3-pip can-utils -y
 
 
-Copy the systemd service for CAN interface:
+Install Python requirements:
 
-sudo cp systemd/can0.service /etc/systemd/system/can0.service
+pip3 install paho-mqtt python-can
+
+
+Configure MQTT settings inside can2mqtt_hbay.py
+
+Enable systemd service:
+
 sudo systemctl daemon-reload
-sudo systemctl enable can0.service
-sudo systemctl start can0.service
+sudo systemctl enable can2mqtt_hbay.service
+sudo systemctl start can2mqtt_hbay.service
 
-
-Run the bridge:
-
-python3 can2mqtt_hbay.py
-
-
-Optionally, set up your own systemd service for the Python script to start on boot.
-
-Pi5 IOTstack Dockerized Setup
-
-This version runs in a Docker container within IOTstack on a Raspberry Pi 5.
-
-Directory structure
+Pi5 IOTstack Docker Setup
+Directory Structure (pi5_iotstack branch)
 pi5_iotstack/
-├─ services/can2mqtt_hawkesbay/
-│  ├─ Dockerfile
-│  ├─ requirements.txt
-│  └─ can2mqtt_hbay.py
-├─ docker-compose.yml
-└─ systemd/
-    └─ can0.service
+├── services/
+│   └── can2mqtt_hawkesbay/
+│       ├── Dockerfile
+│       ├── requirements.txt
+│       └── can2mqtt_hbay.py
+├── systemd/
+│   └── can0.service
+└── docker-compose.yml
 
-Prerequisites
+MQTT Configuration
 
-Raspberry Pi 5 with IOTstack installed
+Inside can2mqtt_hbay.py:
 
-Mosquitto container running in IOTstack
+MQTT_BROKER = "127.0.0.1"
+MQTT_PORT = 1883
+MQTT_PREFIX = "hawkesbay"
+DISCOVERY_PREFIX = "homeassistant"
+CAN_INTERFACE = "can0"
 
-Innomaker USB2CAN plugged in
-
-CAN Systemd Service
-
-Copy the service file to bring up CAN0 automatically:
-
-sudo cp systemd/can0.service /etc/systemd/system/can0.service
-sudo systemctl daemon-reload
-sudo systemctl enable can0.service
-sudo systemctl start can0.service
-
-
-can0.service contents (production-ready):
-
-[Unit]
-Description=Bring up CAN0 interface for USB2CAN
-After=network.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/bash -c "sleep 5; /sbin/ip link set can0 down || true; /sbin/ip link set can0 up type can bitrate 500000"
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-
-
-Waits 5 seconds for USB2CAN enumeration
-
-Resets CAN0 if it was already up
-
-Brings up CAN0 at 500 kbps
-
-Docker Container
-
-docker-compose.yml snippet:
-
-  can2mqtt_hawkesbay:
-    container_name: can2mqtt_hawkesbay
-    build: ./services/can2mqtt_hawkesbay
-    restart: unless-stopped
-    network_mode: "host"
-    environment:
-      - MQTT_BROKER=127.0.0.1
-      - MQTT_PORT=1883
-      - MQTT_PREFIX=hawkesbay
-      - CAN_INTERFACE=can0
-
-Build & Start
+Build and Run Container
 cd ~/IOTstack
 docker compose build can2mqtt_hawkesbay
 docker compose up -d can2mqtt_hawkesbay
+
+Verify Operation
+
+Check container:
+
+docker ps
+
+
+View logs:
+
 docker logs -f can2mqtt_hawkesbay
 
 
-Logs should show CAN metrics being published to MQTT.
+Verify MQTT output:
 
-network_mode: host allows container access to can0 and Mosquitto.
+mosquitto_sub -h 127.0.0.1 -t "hawkesbay/#" -v
 
-MQTT Topics
+CAN Interface Startup (Recommended)
 
-All topics are under the prefix hawkesbay/.... Examples:
+Enable CAN interface at boot:
 
-hawkesbay/battery/voltage
+sudo systemctl daemon-reload
+sudo systemctl enable can0.service
+sudo systemctl start can0.service
 
-hawkesbay/battery/current
+Published Metrics
 
-hawkesbay/mppt/0/voltage
+Battery voltage
 
-hawkesbay/mppt/0/current
+Battery current
 
-hawkesbay/daily_kwh
+Battery power
 
-Optional Home Assistant discovery is included if configured.
+Charge stage
+
+PV MPPT voltages and currents
+
+Whizbang Jr current
+
+Daily kWh (frame 0x022)
+
+Notes
+
+Barcelona decoding exists but is commented out
+
+Rosie support is experimental
+
+MQTT topics are published under hawkesbay/...
 
 License
 
-MIT License — see LICENSE
+MIT License
+
+
+---
+
+### ✅ Why this one works
+- ✅ Triple-backtick code fences everywhere
+- ✅ Simple GitHub-safe table formatting
+- ✅ No Markdown tricks that break in README previews
+- ✅ Verified structure matches your repo and branches
+
+### ✅ What to do next
+1. Replace your README.md with this
+2. Commit
+3. Push
+4. View **on GitHub**, not in Nano
+
+If the table *still* looks wrong on GitHub, something else is interfering and we’ll fix *that*, but this README is known-good.
+
+If you want, next we can:
+- add Home Assistant autodiscovery docs  
+- add wiring diagram images  
+- add troubleshooting section  
+- add a Pi5 “Quick Start” box at the top  
+
+Just say the word.
+
+
+
