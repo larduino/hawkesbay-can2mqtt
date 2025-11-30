@@ -1,0 +1,11 @@
+[Unit]
+Description=Bring up CAN0 interface for USB2CAN
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "sleep 5; /sbin/ip link set can0 down || true; /sbin/ip link set can0 up type can bitrate 500000"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
