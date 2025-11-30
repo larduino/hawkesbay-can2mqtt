@@ -1,192 +1,162 @@
-# HawkesBay CAN → MQTT Bridge
+Hawkes Bay CAN → MQTT Bridge
 
-CAN → MQTT bridge for Midnite Solar Hawkes Bay, Barcelona, and potentially Rosie charge controllers.
+Reads CANBus data from Midnite Solar charge controllers and publishes to MQTT for Home Assistant, Node-RED, or any MQTT consumer.
 
----
+Table of Contents
 
-## 📡 Overview
-This project reads raw CANBus frames from Midnite Solar charge controllers and publishes decoded metrics to MQTT. It allows you to view full system telemetry in:
+Pi3 Standalone Setup
 
-- Home Assistant  
-- Node-RED  
-- MQTT Explorer  
-- Any MQTT-compatible system  
+Pi5 IOTstack Dockerized Setup
 
-This project uses:
+MQTT Topics
 
-- InnoMaker USB2CAN (preferred, automatically detected as `can0`)  
-- SocketCAN on Linux / Raspberry Pi  
-- Python script (`can2mqtt_hbay.py`) to decode CAN frames  
+License
 
-Supported controllers:
+Pi3 Standalone Setup
 
-- ✔ Hawkes Bay  
-- ✔ Barcelona *(commented-out code, can be enabled for Barcelona users)*  
-- ⚠ Rosie *(experimental — needs frame captures)*
+This is the original setup running directly on a Raspberry Pi 3B+.
 
----
+Hardware
 
-## 🚀 Features
+Raspberry Pi 3B+
 
-- Reads CANBus frames via SocketCAN (`can0`)  
-- Decodes:  
-  - Battery voltage, current, power  
-  - State of charge / charge stage  
-  - Temperatures  
-  - PV MPPT voltage & current  
-  - Whizbang Jr current  
-  - Daily kWh production  
-- Throttled MQTT publishing to reduce traffic  
-- Clean MQTT topic structure  
-- Optional Home Assistant discovery  
-- Optional systemd service  
+Innomaker USB2CAN or CANable/CANable Pro
 
----
+CAN-H & CAN-L connected to charge controller
 
-## 🔧 Requirements
+Software
 
-### Hardware
-- Raspberry Pi  
-- InnoMaker USB2CAN (preferred)  
-- CAN-H & CAN-L wired to charge controller (pin 4 = CAN High, pin 5 = CAN Low)
+Linux with SocketCAN
+
+Python 3.8+
+
+MQTT broker (Mosquitto recommended)
+
+Installation
+
+Clone the repo:
+
+git clone https://github.com/larduino/hawkesbay-can2mqtt.git
+cd hawkesbay-can2mqtt/pi3_standalone
 
 
-### Software
-- Linux with SocketCAN  
-- Python 3.8+  
-- MQTT broker (Mosquitto recommended)
+Install Python dependencies:
 
----
-
-## 📦 Install Required Packages
-
-### Install CAN utilities
-```
-sudo apt install can-utils
-
-Python dependencies
-
-pip3 install paho-mqtt python-can
-
-📥 Installation
-1. Clone the repository
-
-git clone https://github.com/<your-username>/hawkesbay-canbus-mqtt.git
-cd hawkesbay-canbus-mqtt
-
-🔌 Enable SocketCAN
-Innomaker USB2CAN (preferred)
-
-sudo ip link set can0 down
-sudo ip link set can0 type can bitrate 500000
-sudo ip link set can0 up
-
-### If using CANable (candleLight)
-```bash
-sudo ip link set can0 up type can bitrate 250000
-```
-### If using Innomaker 
-'''
-sudo ip link set can0 down
-sudo ip link set can0 type can bitrate 500000
-sudo ip link set can0 up
-'''
-
-Optional: Monitor CAN live
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
 
-candump can0
+Copy the systemd service for CAN interface:
 
-Verify interface
+sudo cp systemd/can0.service /etc/systemd/system/can0.service
+sudo systemctl daemon-reload
+sudo systemctl enable can0.service
+sudo systemctl start can0.service
 
-ifconfig can0
 
-▶️ Running the Script
-Run directly
+Run the bridge:
 
 python3 can2mqtt_hbay.py
 
-Optional: fix ownership
 
-sudo chown pi:pi can2mqtt_hbay.py
+Optionally, set up your own systemd service for the Python script to start on boot.
 
-Optional: make executable
+Pi5 IOTstack Dockerized Setup
 
-chmod +x can2mqtt_hbay.py
+This version runs in a Docker container within IOTstack on a Raspberry Pi 5.
 
-🛠 systemd Service (optional)
-Install service
+Directory structure
+pi5_iotstack/
+├─ services/can2mqtt_hawkesbay/
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  └─ can2mqtt_hbay.py
+├─ docker-compose.yml
+└─ systemd/
+    └─ can0.service
 
-sudo cp can2mqtt_hbay.service /etc/systemd/system/
+Prerequisites
+
+Raspberry Pi 5 with IOTstack installed
+
+Mosquitto container running in IOTstack
+
+Innomaker USB2CAN plugged in
+
+CAN Systemd Service
+
+Copy the service file to bring up CAN0 automatically:
+
+sudo cp systemd/can0.service /etc/systemd/system/can0.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now can2mqtt_hbay.service
+sudo systemctl enable can0.service
+sudo systemctl start can0.service
 
-View logs
 
-sudo journalctl -fu can2mqtt_hbay.service
+can0.service contents (production-ready):
 
-📡 Example MQTT Topics
+[Unit]
+Description=Bring up CAN0 interface for USB2CAN
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "sleep 5; /sbin/ip link set can0 down || true; /sbin/ip link set can0 up type can bitrate 500000"
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+
+
+Waits 5 seconds for USB2CAN enumeration
+
+Resets CAN0 if it was already up
+
+Brings up CAN0 at 500 kbps
+
+Docker Container
+
+docker-compose.yml snippet:
+
+  can2mqtt_hawkesbay:
+    container_name: can2mqtt_hawkesbay
+    build: ./services/can2mqtt_hawkesbay
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - MQTT_BROKER=127.0.0.1
+      - MQTT_PORT=1883
+      - MQTT_PREFIX=hawkesbay
+      - CAN_INTERFACE=can0
+
+Build & Start
+cd ~/IOTstack
+docker compose build can2mqtt_hawkesbay
+docker compose up -d can2mqtt_hawkesbay
+docker logs -f can2mqtt_hawkesbay
+
+
+Logs should show CAN metrics being published to MQTT.
+
+network_mode: host allows container access to can0 and Mosquitto.
+
+MQTT Topics
+
+All topics are under the prefix hawkesbay/.... Examples:
 
 hawkesbay/battery/voltage
+
 hawkesbay/battery/current
-hawkesbay/battery/power
-hawkesbay/battery/charge_stage
-hawkesbay/pv/voltage_mppt2
-hawkesbay/pv/current_mppt2
-hawkesbay/daily/kwh_today
-hawkesbay/whizbang/amps
-hawkesbay/whizbang/status
-hawkesbay/whizbang/mode
-hawkesbay/state
 
-Optional Barcelona topics (commented-out in code)
+hawkesbay/mppt/0/voltage
 
-hawkesbay/pv/voltage_mppt0
-hawkesbay/pv/current_mppt0
+hawkesbay/mppt/0/current
 
-🏠 Home Assistant Example
+hawkesbay/daily_kwh
 
-sensor:
-  - platform: mqtt
-    name: "HB Battery Voltage"
-    state_topic: "hawkesbay/battery/voltage"
-    unit_of_measurement: "V"
+Optional Home Assistant discovery is included if configured.
 
-  - platform: mqtt
-    name: "HB PV Watts"
-    state_topic: "hawkesbay/pv/watts"
-    unit_of_measurement: "W"
+License
 
-🔌 Wiring Diagram
-
-Charge Controller      Raspberry Pi / USB2CAN
--------------          -------------------
-Pin 4 CAN High   -->   CAN-H
-Pin 5 CAN Low    -->   CAN-L
-GND              -->   GND
-5V / 3.3V        -->   USB power for USB2CAN (if needed)
-
-📝 Notes
-
-    Barcelona MPPT #1 section is left commented for future users.
-
-    Rosie decoding is experimental.
-
-    PRs welcome for new CAN frame IDs, controller support, or documentation improvements.
-
-🤝 Contributing
-
-PRs welcome — especially:
-
-    New CAN frame IDs
-
-    Expanded controller support
-
-    Documentation improvements
-
-📜 License
-
-MIT License
-📬 Contact
-
-Open a GitHub Issue for questions, improvements, or contributions.
+MIT License — see LICENSE
