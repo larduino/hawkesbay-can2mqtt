@@ -8,6 +8,8 @@ __pycache__/
 # Virtual envs
 venv/
 .env/
+.env*
+
 
 # Systemd backup files
 *.service~
