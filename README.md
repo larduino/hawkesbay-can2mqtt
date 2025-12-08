@@ -60,17 +60,15 @@ Pi5 IOTstack Docker Setup
 
 Directory Structure
 
-pi5_iotstack/ 
-├── services/ 
-│  └── can2mqtt_hawkesbay/ 
+pi5_iotstack/
+├── services/
+│   └── can2mqtt_hawkesbay/
 │       ├── Dockerfile
-│       ├── requirements.txt 
-│       └── can2mqtt_hbay.py 
+│       ├── requirements.txt
+│       └── can2mqtt_hbay.py
 ├── systemd/
 │   └── can0.service
 └── docker-compose.yml
-				   
-
 
 MQTT Configuration (inside can2mqtt_hbay.py)
 
