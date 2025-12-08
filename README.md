@@ -100,17 +100,16 @@ sudo systemctl daemon-reload
 sudo systemctl enable can0.service
 sudo systemctl start can0.service
 
-Published Metrics
+| Metric                      | Entity Example (HA `_2` fix)                         |
+| --------------------------- | ---------------------------------------------------- |
+| Battery voltage             | `sensor.midnite_hawkes_bay_battery_voltage_2`        |
+| Battery current             | `sensor.midnite_hawkes_bay_battery_current_2`        |
+| Battery power               | `sensor.midnite_hawkes_bay_battery_power_2`          |
+| Charge stage                | `sensor.midnite_hawkes_bay_battery_charge_stage`     |
+| PV MPPT voltages & currents | `sensor.midnite_hawkes_bay_pv_voltage_mppt2_2`, etc. |
+| Whizbang Jr current         | `sensor.midnite_hawkes_bay_whizbang_jr_amps_2`       |
+| Daily kWh (frame 0x022)     | `sensor.midnite_hawkes_bay_daily_kwh_today`          |
 
-Battery voltage, current, power
-
-Charge stage
-
-PV MPPT voltages and currents
-
-Whizbang Jr current and power
-
-Daily kWh (frame 0x022)
 
 Note: Some experimental support for Barcelona or Rosie exists but may be commented out.
 
