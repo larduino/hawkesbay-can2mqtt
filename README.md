@@ -59,7 +59,7 @@ sudo systemctl start can2mqtt_hbay.service
 Pi5 IOTstack Docker Setup
 
 Directory Structure
-
+```
 pi5_iotstack/
 ├── services/
 │   └── can2mqtt_hawkesbay/
@@ -69,6 +69,7 @@ pi5_iotstack/
 ├── systemd/
 │   └── can0.service
 └── docker-compose.yml
+```
 
 MQTT Configuration (inside can2mqtt_hbay.py)
 
