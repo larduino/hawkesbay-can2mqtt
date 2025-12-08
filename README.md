@@ -100,15 +100,15 @@ sudo systemctl daemon-reload
 sudo systemctl enable can0.service
 sudo systemctl start can0.service
 
-| Metric                      | Entity Example (HA `_2` fix)                         |
-| --------------------------- | ---------------------------------------------------- |
-| Battery voltage             | `sensor.midnite_hawkes_bay_battery_voltage_2`        |
-| Battery current             | `sensor.midnite_hawkes_bay_battery_current_2`        |
-| Battery power               | `sensor.midnite_hawkes_bay_battery_power_2`          |
-| Charge stage                | `sensor.midnite_hawkes_bay_battery_charge_stage`     |
-| PV MPPT voltages & currents | `sensor.midnite_hawkes_bay_pv_voltage_mppt2_2`, etc. |
-| Whizbang Jr current         | `sensor.midnite_hawkes_bay_whizbang_jr_amps_2`       |
-| Daily kWh (frame 0x022)     | `sensor.midnite_hawkes_bay_daily_kwh_today`          |
+| Metric                      | Entity Example                                     |
+| --------------------------- | ---------------------------------------------------|
+| Battery voltage             | `sensor.midnite_hawkes_bay_battery_voltage`        |
+| Battery current             | `sensor.midnite_hawkes_bay_battery_current`        |
+| Battery power               | `sensor.midnite_hawkes_bay_battery_power`          |
+| Charge stage                | `sensor.midnite_hawkes_bay_battery_charge_stage`   |
+| PV MPPT voltages & currents | `sensor.midnite_hawkes_bay_pv_voltage_mppt2`, etc. |
+| Whizbang Jr current         | `sensor.midnite_hawkes_bay_whizbang_jr_amps`       |
+| Daily kWh (frame 0x022)     | `sensor.midnite_hawkes_bay_daily_kwh_today`        |
 
 
 Note: Some experimental support for Barcelona or Rosie exists but may be commented out.
