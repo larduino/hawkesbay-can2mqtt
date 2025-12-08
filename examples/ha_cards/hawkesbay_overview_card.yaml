@@ -1,0 +1,195 @@
+title: Hawkes Bay Solar
+views:
+  - title: Overview
+    path: hawkesbay
+    icon: mdi:solar-power
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Battery
+            icon: mdi:battery
+          - type: gauge
+            name: Battery Power
+            entity: sensor.midnite_hawkes_bay_battery_power
+            unit: W
+            min: -3000
+            max: 3000
+            severity:
+              red: -3000
+              yellow: -500
+              green: 0
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.midnite_hawkes_bay_battery_voltage
+                name: Voltage (V)
+              - entity: sensor.midnite_hawkes_bay_battery_current
+                name: Current (A)
+              - entity: sensor.midnite_hawkes_bay_battery_charge_stage
+                name: Charge Stage
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: PV Input (MPPT2)
+            icon: mdi:solar-power
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.midnite_hawkes_bay_pv_voltage_mppt2
+                name: Voltage (V)
+              - entity: sensor.midnite_hawkes_bay_pv_current_mppt2
+                name: Current (A)
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Whizbang Jr
+            icon: mdi:current-dc
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.midnite_hawkes_bay_whizbang_jr_amps
+                name: Current (A)
+              - entity: sensor.midnite_hawkes_bay_whizbang_jr_power
+                name: Power (W)
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Energy
+            icon: mdi:counter
+          - type: entity
+            entity: sensor.midnite_hawkes_bay_daily_kwh_today
+            name: Today
+            icon: mdi:transmission-tower-export
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Debug / Raw States
+            icon: mdi:code-json
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.battery_charge_state
+                name: Battery JSON
+              - entity: sensor.charge_state_code
+                name: PV JSON
+              - entity: sensor.midnite_hawkes_bay_hb_whizbang_json
+                name: Whizbang JSON
+              - entity: sensor.midnite_hawkes_bay_hb_daily_json
+                name: Daily JSON
+      - square: true
+        type: grid
+        columns: 2
+        cards:
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_whizbang_jr_amps
+            name: Whizbang Amps
+            needle: true
+            min: -200
+            max: 200
+            severity:
+              green: 0
+              yellow: -50
+              red: -150
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_whizbang_jr_power
+            name: Whizbang Power
+            needle: true
+            min: -3000
+            max: 3000
+            severity:
+              green: 0
+              yellow: -500
+              red: -2000
+      - square: true
+        type: grid
+        columns: 2
+        cards:
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_pv_voltage_mppt2
+            name: PV Voltage
+            needle: true
+            min: 0
+            max: 200
+            severity:
+              green: 80
+              yellow: 40
+              red: 10
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_pv_current_mppt2
+            name: PV Current
+            needle: true
+            min: 0
+            max: 60
+            severity:
+              green: 10
+              yellow: 5
+              red: 1
+      - square: true
+        type: grid
+        columns: 3
+        cards:
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_battery_power
+            name: Battery Power
+            needle: true
+            min: -3000
+            max: 3000
+            severity:
+              green: 0
+              yellow: -500
+              red: -3000
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_battery_voltage
+            name: Battery Voltage
+            needle: true
+            min: 40
+            max: 64
+            severity:
+              green: 52
+              yellow: 48
+              red: 44
+          - type: gauge
+            entity: sensor.midnite_hawkes_bay_battery_current
+            name: Battery Current
+            needle: true
+            min: -150
+            max: 150
+            severity:
+              green: 0
+              yellow: -50
+              red: -150
+square: true
+type: grid
+columns: 3
+cards:
+  - type: gauge
+    entity: sensor.midnite_hawkes_bay_battery_power
+    name: Battery Power
+    needle: true
+    min: -3000
+    max: 3000
+    severity:
+      green: 0
+      yellow: -500
+      red: -3000
+  - type: gauge
+    entity: sensor.midnite_hawkes_bay_battery_voltage
+    name: Battery Voltage
+    needle: true
+    min: 40
+    max: 64
+    severity:
+      green: 52
+      yellow: 48
+      red: 44
+  - type: gauge
+    entity: sensor.midnite_hawkes_bay_battery_current
+    name: Battery Current
+    needle: true
+    min: -150
+    max: 150
+    severity:
+      green: 0
+      yellow: -50
+      red: -150
