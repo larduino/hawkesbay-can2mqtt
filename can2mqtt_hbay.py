@@ -20,13 +20,16 @@ import json
 from datetime import datetime
 
 # ----------------------------
-# Configuration
+# Configuration from environment
 # ----------------------------
-MQTT_BROKER = "192.168.3.50"
-MQTT_PORT = 1883
-MQTT_PREFIX = "hawkesbay"
-DISCOVERY_PREFIX = "homeassistant"
-CAN_INTERFACE = "can0"
+MQTT_BROKER = os.getenv("CAN2MQTT_MQTT_BROKER", "127.0.0.1")
+MQTT_PORT = int(os.getenv("CAN2MQTT_MQTT_PORT", "1883"))
+MQTT_USERNAME = os.getenv("CAN2MQTT_MQTT_USERNAME", None)
+MQTT_PASSWORD = os.getenv("CAN2MQTT_MQTT_PASSWORD", None)
+MQTT_PREFIX = os.getenv("CAN2MQTT_MQTT_PREFIX", "hawkesbay")
+DISCOVERY_PREFIX = os.getenv("CAN2MQTT_DISCOVERY_PREFIX", "homeassistant")
+CAN_INTERFACE = os.getenv("CAN2MQTT_CAN_INTERFACE", "can0")
+
 
 # Throttle intervals (seconds)
 BATTERY_INTERVAL = 1.0
@@ -62,29 +65,38 @@ def pub(topic, value, retain=True):
     payload = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
     client.publish(full, payload, retain=retain)
 
+
 # ----------------------------
 # Helper: Home Assistant discovery
 # ----------------------------
-def ha_discovery(sensor_id, name, unit, topic, device_class=None, state_class=None):
-    cfg_topic = f"{DISCOVERY_PREFIX}/sensor/midnite_hawkes_bay_{sensor_id}/config"
+def ha_discovery(sensor_id, name, unit, topic,
+                 device_class=None, state_class=None):
+
+    object_id = f"midnite_hawkes_bay_{sensor_id}"
+
+    cfg_topic = f"{DISCOVERY_PREFIX}/sensor/{object_id}/config"
+
     payload = {
         "name": name,
-        "uniq_id": f"midnite_hawkes_bay_{sensor_id}",
+        "unique_id": object_id,   # ✅ FIXED
         "state_topic": f"{MQTT_PREFIX}/{topic}",
         "unit_of_measurement": unit,
         "device": {
             "identifiers": ["midnite_hawkes_bay"],
             "name": "Midnite Hawkes Bay",
-            "model": "Hawke's Bay",
+            "model": "Hawkes Bay",
             "manufacturer": "Midnite Solar"
         }
     }
+
     if device_class:
         payload["device_class"] = device_class
+
     if state_class:
         payload["state_class"] = state_class
-    client.publish(cfg_topic, json.dumps(payload), retain=True)
 
+    client.publish(cfg_topic, json.dumps(payload), retain=True)
+	
 # ----------------------------
 # Publish HA discovery
 # ----------------------------
