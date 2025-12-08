@@ -113,24 +113,20 @@ sudo systemctl start can0.service
 
 Note: Some experimental support for Barcelona or Rosie exists but may be commented out.
 
-Home Assistant Dashboard Example
+H## Home Assistant Dashboard Example
 
 A fully working Lovelace card for Hawkes Bay sensors is provided here:
 
-examples/ha_cards/hawkesbay_overview_card.yaml
+`examples/ha_cards/hawkesbay_overview_card.yaml`
 
+This includes gauges and entities for:
 
-Includes gauges and entities for:
+- Battery voltage, current, power, and charge stage  
+- PV MPPT voltages and currents  
+- Whizbang Jr current and power  
+- Daily energy (kWh)  
+- Debug / raw JSON states
 
-Battery voltage, current, power, and charge stage
-
-PV MPPT voltages and currents
-
-Whizbang Jr current and power
-
-Daily energy (kWh)
-
-Debug / raw JSON states
 
 Notes
 
@@ -138,7 +134,6 @@ MQTT topics are published under hawkesbay/...
 
 Home Assistant unique ID issue fixed in can2mqtt_hbay.py (all sensors now use unique IDs)
 
-_2 suffix on some sensors is required if old entities exist
 
 License
 
