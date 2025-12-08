@@ -3,18 +3,21 @@ Purpose
 
 Read raw CANBus frames from Midnite Solar charge controllers (Hawkes Bay, Barcelona, experimental Rosie), decode metrics, and publish them to MQTT for Home Assistant, Node-RED, or any MQTT consumer.
 
-Pi3 vs Pi5 Setup Comparison
-Feature 	Pi3 Standalone 	Pi5 IOTstack (Docker)
-Raspberry Pi Model 	3B+ 	5
-Python 	Local install (3.8+) 	Docker container (python 3.11-slim)
-CAN Adapter 	Innomaker USB2CAN / CANable 	Innomaker USB2CAN / CANable
-CAN Interface 	SocketCAN (can0) 	SocketCAN (can0)
-CAN Startup 	systemd + udev 	systemd CAN service
-MQTT Broker 	Local or network Mosquitto 	IOTstack Mosquitto
-Script Execution 	systemd service 	Docker container
-Auto Restart 	systemd 	Docker restart policy
-GitHub Branch 	main / master 	pi5_iotstack
-Docker Required 	❌ 	✅
+
+## Pi3 vs Pi5 Setup Comparison
+
+| Feature | Pi3 Standalone | Pi5 IOTstack (Docker) |
+|-------|---------------|-----------------------|
+| Raspberry Pi Model | 3B+ | 5 |
+| Python | Local install (3.8+) | Docker container (python 3.11-slim) |
+| CAN Adapter | Innomaker USB2CAN / CANable | Innomaker USB2CAN / CANable |
+| CAN Interface | SocketCAN (`can0`) | SocketCAN (`can0`) |
+| CAN Startup | systemd + udev | systemd CAN service |
+| MQTT Broker | Local or network Mosquitto | IOTstack Mosquitto |
+| Script Execution | systemd service | Docker container |
+| Auto Restart | systemd | Docker restart policy |
+| GitHub Branch | `main` / `master` | `pi5_iotstack` |
+| Docker Required | ❌ | ✅ |
 Hardware
 
 Raspberry Pi (3B+ standalone or 5 with IOTstack)
