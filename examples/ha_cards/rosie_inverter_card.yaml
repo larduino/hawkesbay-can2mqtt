@@ -1,0 +1,54 @@
+type: vertical-stack
+cards:
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.rosie_load_watts
+        name: House Load
+        unit: W
+        min: 0
+        max: 5000
+        needle: true
+        severity:
+          green: 0
+          yellow: 3000
+          red: 4500
+      - type: gauge
+        entity: sensor.battery_voltage
+        name: Battery
+        unit: V
+        min: 44
+        max: 62
+        needle: true
+        severity:
+          green: 52
+          yellow: 48
+          red: 44
+  - type: entities
+    title: Rosie Inverter Status
+    show_header_toggle: false
+    state_color: true
+    entities:
+      - entity: sensor.rosie_ac_output
+        name: AC Output Power
+        icon: mdi:lightning-bolt
+      - entity: sensor.rosie_load_watts
+        name: Total DC Drain
+        icon: mdi:battery-minus
+      - entity: sensor.rosie_ac_input
+        name: Generator Input
+        icon: mdi:generator-portable
+      - type: divider
+      - entity: sensor.rosie_fet_temp
+        name: Inverter FET Temp
+        icon: mdi:thermometer-high
+      - entity: sensor.rosie_transformer_temp
+        name: Transformer Temp
+        icon: mdi:thermometer
+      - type: divider
+      - entity: sensor.battery_charge_stage
+        name: Charge Stage
+        icon: mdi:solar-power-variant
+      - entity: sensor.whizbang_net_amps
+        name: Net Battery Amps
+        icon: mdi:current-dc
