@@ -1,140 +1,92 @@
 Hawkes Bay CAN → MQTT Bridge
 Purpose
 
-Read raw CANBus frames from Midnite Solar charge controllers (Hawkes Bay, Barcelona, experimental Rosie), decode metrics, and publish them to MQTT for Home Assistant, Node-RED, or any MQTT consumer.
+Read raw CANBus frames from Midnite Solar devices (Hawkes Bay, Barcelona, Rosie Inverter, and Whizbang Jr), decode metrics, and publish them to MQTT.
 
+This bridge is designed for stability, featuring a State Buffer that filters out heartbeat "zero" data to ensure clean, consistent history graphs in Home Assistant.
+🚀 Key Improvements in this Version
 
-## Pi3 vs Pi5 Setup Comparison
+    Flattened Structure: No more nested folders; code and Docker files are in the root for easier deployment.
 
-| Feature | Pi3 Standalone | Pi5 IOTstack (Docker) |
-|-------|---------------|-----------------------|
-| Raspberry Pi Model | 3B+ | 5 |
-| Python | Local install (3.8+) | Docker container (python 3.11-slim) |
-| CAN Adapter | Innomaker USB2CAN / CANable | Innomaker USB2CAN / CANable |
-| CAN Interface | SocketCAN (`can0`) | SocketCAN (`can0`) |
-| CAN Startup | systemd + udev | systemd CAN service |
-| MQTT Broker | Local or network Mosquitto | IOTstack Mosquitto |
-| Script Execution | systemd service | Docker container |
-| Auto Restart | systemd | Docker restart policy |
-| GitHub Branch | `main` / `master` | `pi5_iotstack` |
-| Docker Required | ❌ | ✅ |
-Hardware
+    Data Ironcladding: The script maintains a state JSON object that ignores empty "heartbeat" packets, preventing data drops.
 
-Raspberry Pi (3B+ standalone or 5 with IOTstack)
+    Rosie Integration: Decodes AC Load Watts, FET Temperatures, and Transformer Temperatures.
 
-Innomaker USB2CAN (preferred) or CANable / CANable Pro
+    High-Voltage PV Fix: Properly targets register 0x81 for accurate Hawkes Bay PV voltage tracking.
 
-CAN-H and CAN-L connected to Midnite Solar charge controller
+    Throttled Updates: Publishes a full system state every 10 seconds to reduce MQTT overhead while keeping high-speed data available on individual topics.
 
-Software
+🛠 Hardware Requirements
 
-Linux with SocketCAN
+    Raspberry Pi: (Tested on Pi 3B+ and Pi 5).
 
-Python 3.8+ (Pi3) or Docker (Pi5)
+    CAN Interface: Innomaker USB2CAN (preferred), CANable, or Waveshare RS485 CAN HAT.
 
-MQTT broker (Mosquitto recommended)
+    Connection: CAN-H and CAN-L connected to the Midnite Solar Battery/Comm bus.
 
-GitHub Branches
+📂 Repository Structure
+Plaintext
 
-main / master – Pi3 standalone installation (no Docker), now contains all Pi5 updates.
+.
+├── can2mqtt_hbay.py       # Main Python Bridge
+├── Dockerfile              # Container definition
+├── requirements.txt        # Python dependencies
+├── docker-compose.yml      # Example deployment
+├── can2mqtt_hbay.service   # systemd unit file
+└── examples/
+    └── ha_cards/           # Lovelace YAML examples
 
-pi5_iotstack – Deprecated; merged into main.
+⚙️ Installation
+Option 1: Docker (Recommended for Pi 5 / IOTstack)
 
-Pi3 Standalone Setup
+    Edit can2mqtt_hbay.py with your MQTT Broker IP.
 
-Install dependencies:
+    Build and launch:
+    Bash
 
-sudo apt install python3 python3-pip can-utils -y
+    docker compose build
+    docker compose up -d
+
+Option 2: Standalone Linux Service
+
+    Install dependencies:
+    Bash
+
 pip3 install paho-mqtt python-can
 
+Enable the service:
+Bash
 
-Configure MQTT settings inside can2mqtt_hbay.py.
+    sudo cp can2mqtt_hbay.service /etc/systemd/system/
+    sudo systemctl enable --now can2mqtt_hbay.service
 
-Enable systemd service:
+📊 Home Assistant Integration
+Stable State Monitoring
 
-sudo systemctl daemon-reload
-sudo systemctl enable can2mqtt_hbay.service
-sudo systemctl start can2mqtt_hbay.service
+Instead of tracking dozens of individual topics, it is recommended to use the hawkesbay/state topic. It provides a synchronized JSON blob:
+Metric	JSON Path	Description
+Battery Power	state.battery.power	Total Watts (filtered)
+Rosie Load	state.rosie.load_watts	AC Output Watts
+FET Temp	state.rosie.fet_temp_f	Inverter Temperature
+PV Volts	state.pv.voltage	High-Voltage DC Input
+Daily kWh	state.daily.kwh_today	Solar harvest for today
+Example Template Sensor
+YAML
 
-Pi5 IOTstack Docker Setup
+- name: "Hawkes Bay PV Voltage"
+  unit_of_measurement: "V"
+  state: "{{ state_attr('sensor.hbay_bridge_state', 'pv').voltage | float(0) }}"
 
-Directory Structure
-```
-pi5_iotstack/
-├── services/
-│   └── can2mqtt_hawkesbay/
-│       ├── Dockerfile
-│       ├── requirements.txt
-│       └── can2mqtt_hbay.py
-├── systemd/
-│   └── can0.service
-└── docker-compose.yml
-```
+📉 Example Dashboard
 
-MQTT Configuration (inside can2mqtt_hbay.py)
+See examples/ha_cards/ for YAML snippets for:
 
-MQTT_BROKER = "127.0.0.1"
-MQTT_PORT = 1883
-MQTT_PREFIX = "hawkesbay"
-DISCOVERY_PREFIX = "homeassistant"
-CAN_INTERFACE = "can0"
+    Gauges: Real-time House Load and Battery Voltage.
 
+    ApexCharts: Tracking PV harvest vs. Battery Charge.
 
-Build and Run Container
+    Thermal Monitoring: Tracking Inverter FET and Transformer temps.
 
-cd ~/IOTstack
-docker compose build can2mqtt_hawkesbay
-docker compose up -d can2mqtt_hawkesbay
+📝 License
 
-
-Verify Operation
-
-docker ps
-docker logs -f can2mqtt_hawkesbay
-mosquitto_sub -h 127.0.0.1 -t "hawkesbay/#" -v
-
-
-CAN Interface Startup (Recommended)
-
-sudo systemctl daemon-reload
-sudo systemctl enable can0.service
-sudo systemctl start can0.service
-
-| Metric                      | Entity Example                                     |
-| --------------------------- | ---------------------------------------------------|
-| Battery voltage             | `sensor.midnite_hawkes_bay_battery_voltage`        |
-| Battery current             | `sensor.midnite_hawkes_bay_battery_current`        |
-| Battery power               | `sensor.midnite_hawkes_bay_battery_power`          |
-| Charge stage                | `sensor.midnite_hawkes_bay_battery_charge_stage`   |
-| PV MPPT voltages & currents | `sensor.midnite_hawkes_bay_pv_voltage_mppt2`, etc. |
-| Whizbang Jr current         | `sensor.midnite_hawkes_bay_whizbang_jr_amps`       |
-| Daily kWh (frame 0x022)     | `sensor.midnite_hawkes_bay_daily_kwh_today`        |
-
-
-Note: Some experimental support for Barcelona or Rosie exists but may be commented out.
-
-H## Home Assistant Dashboard Example
-
-A fully working Lovelace card for Hawkes Bay sensors is provided here:
-
-`examples/ha_cards/hawkesbay_overview_card.yaml`
-
-This includes gauges and entities for:
-
-- Battery voltage, current, power, and charge stage  
-- PV MPPT voltages and currents  
-- Whizbang Jr current and power  
-- Daily energy (kWh)  
-- Debug / raw JSON states
-
-
-Notes
-
-MQTT topics are published under hawkesbay/...
-
-Home Assistant unique ID issue fixed in can2mqtt_hbay.py (all sensors now use unique IDs)
-
-
-License
-
-MIT License
+MIT License - Created by @larduino
