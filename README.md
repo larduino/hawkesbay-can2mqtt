@@ -27,7 +27,7 @@ This bridge is designed for stability, featuring a State Buffer that filters out
 📂 Repository Structure
 Plaintext
 
-.
+```.
 ├── can2mqtt_hbay.py       # Main Python Bridge
 ├── Dockerfile              # Container definition
 ├── requirements.txt        # Python dependencies
@@ -35,7 +35,7 @@ Plaintext
 ├── can2mqtt_hbay.service   # systemd unit file
 └── examples/
     └── ha_cards/           # Lovelace YAML examples
-
+```
 ⚙️ Installation
 Option 1: Docker (Recommended for Pi 5 / IOTstack)
 
@@ -45,14 +45,14 @@ Option 1: Docker (Recommended for Pi 5 / IOTstack)
     Bash
 
     docker compose build
-    docker compose up -d
+    docker compose up -d 
 
 Option 2: Standalone Linux Service
 
     Install dependencies:
     Bash
 
-pip3 install paho-mqtt python-can
+``` pip3 install paho-mqtt python-can ```
 
 Enable the service:
 Bash
