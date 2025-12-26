@@ -77,7 +77,10 @@ YAML
   unit_of_measurement: "V"
   state: "{{ state_attr('sensor.hbay_bridge_state', 'pv').voltage | float(0) }}"
 
-📉 Example Dashboard
+📉 Example Dashboard  
+
+
+![rosie](https://github.com/user-attachments/assets/ad942b1d-91d5-43d5-bad8-d81750556d9e)
 
 See examples/ha_cards/ for YAML snippets for:
 
