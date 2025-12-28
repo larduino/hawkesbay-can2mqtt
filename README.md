@@ -1,7 +1,7 @@
 Hawkes Bay CAN → MQTT Bridge
 Purpose
 
-Read raw CANBus frames from Midnite Solar devices (Hawkes Bay, Barcelona, Rosie Inverter, and Whizbang Jr), decode metrics, and publish them to MQTT.
+Read raw CANBus frames from Midnite Solar devices (Hawkes Bay, Barcelona, Rosie Inverter, and Little Rosie ), decode metrics, and publish them to MQTT.
 
 This bridge is designed for stability, featuring a State Buffer that filters out heartbeat "zero" data to ensure clean, consistent history graphs in Home Assistant.
 🚀 Key Improvements in this Version
