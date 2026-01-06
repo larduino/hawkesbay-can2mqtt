@@ -14,6 +14,17 @@ resting_count = 0
 last_sent_val = {}
 last_pub_time = {}
 last_sent_state = 0
+# --- FILTER CONFIG ---
+#last_power_val = 0
+#zero_count = 0
+#MAX_ZERO_IGNORE = 0.5  # Ignore up to 3 consecutive zero messages
+# --- NEW INSTANT UPDATE CONFIG ---
+last_published_p = 0
+zero_p_count = 0
+POWER_CHANGE_THRESHOLD = 5.0  # Instant update if power moves > 5W
+MAX_ZERO_DROPS = 15            # Keep this low (2-3) for responsiveness
+FORCE_UPDATE_INTERVAL = 30     # Send heartbeat every 30s if power is rock steady
+last_force_time = 0
 
 STAGES = {0: "Resting", 1: "Bulk MPPT", 2: "Absorb", 3: "Float", 4: "Equalize", 5: "Float MPPT", 6: "EQ MPPT"}
 
@@ -85,24 +96,46 @@ try:
                 state["whizbang"]["amps"] = wb_amps
                 pub_throttled("whizbang/amps", wb_amps, 0.1)
 
-            # --- BATTERY DATA (0xA0) - Filter the Heartbeats ---
+# --- BATTERY DATA (0xA0) - Filter the Heartbeats ---
             elif reg == 0xA0 and dlen >= 8:
                 v_calc = ((data[0] << 8) | data[1]) / 10.0
-                p_raw = ((data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]) / 100.0
                 a_raw = to_signed_16((data[2] << 8) | data[3]) / 10.0
+                p_raw = ((data[4] << 24) | (data[5] << 16) | (data[6] << 8) | data[7]) / 100.0
                 
-                if v_calc > 40.0:
-                    # Always publish individual topics
-                    pub_throttled("battery/voltage", v_calc, 0.1)
-                    pub_throttled("battery/current", a_raw, 0.1)
-                    pub_throttled("battery/power", round(p_raw, 1), 1.0)
+                current_time = time.time()
+                p_to_send = p_raw
+                
+                # --- SMART ZERO-DROP FILTER ---
+                current_stage = state["battery"]["charge_stage"]
+                is_producing_stage = current_stage in ["Bulk MPPT", "Absorb", "Float", "Float MPPT"]
 
-                    # Only update JSON state if it's likely a real data packet
-                    # (Heartbeats usually have exactly 0 power/current)
-                    if abs(p_raw) > 0.1 or abs(a_raw) > 0.1:
-                        state["battery"]["voltage"] = v_calc
-                        state["battery"]["current"] = a_raw
-                        state["battery"]["power"] = round(p_raw, 1)
+                if p_raw == 0 and last_published_p > 10.0 and is_producing_stage:
+                    zero_p_count += 1
+                    if zero_p_count <= MAX_ZERO_DROPS:
+                        p_to_send = last_published_p
+                        # Optional: log so you know it's working
+                        # print(f"BRIDGE: Hiding 30s Sweep. Stage: {current_stage}")
+                    else:
+                        p_to_send = 0
+                else:
+                    zero_p_count = 0
+                    p_to_send = p_raw
+                
+                # --- INSTANT DELTA LOGIC ---
+                delta = abs(p_to_send - last_published_p)
+                time_since_last = current_time - last_force_time
+
+                if delta >= POWER_CHANGE_THRESHOLD or time_since_last > FORCE_UPDATE_INTERVAL:
+                    # Send to MQTT immediately
+                    client.publish(f"{MQTT_PREFIX}/battery/power", round(p_to_send, 1))
+                    
+                    # Update trackers
+                    last_published_p = p_to_send
+                    last_force_time = current_time
+
+                # Still use throttled for Voltage/Current to keep them from being too noisy
+                pub_throttled("battery/voltage", v_calc, 0.5)
+                pub_throttled("battery/current", a_raw, 0.5)
                     
             # --- CHARGE STAGE (0xA3) ---
             elif reg == 0xA3 and dlen >= 1:
