@@ -1,0 +1,24 @@
+square: true
+type: grid
+columns: 2
+cards:
+  - type: gauge
+    entity: sensor.midnite_hawkes_bay_pv_voltage_mppt2
+    name: PV Voltage
+    needle: true
+    min: 0
+    max: 200
+    severity:
+      green: 80
+      yellow: 40
+      red: 10
+  - type: gauge
+    entity: sensor.midnite_hawkes_bay_pv_current_mppt2
+    name: PV Current
+    needle: true
+    min: 0
+    max: 60
+    severity:
+      green: 10
+      yellow: 5
+      red: 1
