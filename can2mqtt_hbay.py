@@ -98,12 +98,11 @@ try:
                     state["pv"]["voltage"] = round(v, 1)
                     pub_throttled("pv/voltage", round(v, 1), 1.0)
 
-            # --- DAILY TOTALS (0x022) ---
+# --- DAILY TOTALS (0x022) ---
             elif reg == 0x022 and dlen >= 4:
                 k = (data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]) / 100.0
-                if k > 0.1: # Only update if it's a real harvest number
-                    state["daily"]["kwh_today"] = round(k, 2)
-                    pub_throttled("daily/kwh_today", round(k, 2), 0.01)
+                state["daily"]["kwh_today"] = round(k, 2)
+                pub_throttled("daily/kwh_today", round(k, 2), 0.01)
 
             # --- WHIZBANG JR (0x2A3) - Keep it Raw/Sensitive ---
             elif reg == 0x2A3 and dlen >= 4:
